@@ -15,27 +15,12 @@ BOT_ID = os.environ["SECRET_BOT_SLACK_ID"]
 sc = SlackClient(API_TOKEN)
 
 def listen_for_text():
-	"""
-	!solved Puzzlename => :confetti_ball: *Puzzlename*  was solved! :tada:
-	!solved Puzzlename SOLUTION => :confetti_ball: *Puzzlename*  was solved! :tada:  and the answer is *SOLUTION*
-	!almost HardPuzzle => Thanks.  I'll remember that we're very close on *HardPuzzle*.
-	!almost NastyPuzzle => Thanks.  I'll remember that we're very close on *NastyPuzzle*.
-	!almostpuzzles => We're currently very close on the following: *HardPuzzle*, *NastyPuzzle*.
-	!solved HardPuzzle HARDANSWER => :confetti_ball: *HardPuzzle*  was solved! :tada:  and the solution is *HARDANSWER* 
-	!almostpuzzles => We're currently very close on the following: *NastyPuzzle*.
-
-	you can actually replace these puzzle names with #puzzlechannel names.
-
-	also another idea for !almostpuzzles is !whatshouldiworkon
-	or if you're feeling memetic, !whatsgoingon
-	"""
-
 	close_puzzles = set()
 
 	SOLVED_RE = re.compile(r"^(<@{}> )?!solved ?(?P<puzzle_name>\S+)? ?(?P<solution>.+)?$".format(BOT_ID))
 	ALMOST_RE = re.compile(r"^(<@{}> )?!almost( (?P<puzzle_name>\S+))?$".format(BOT_ID))
 	ALMOST_PUZZLES_RE = re.compile(r"^(<@{}> )?!(almostpuzzles|whatshouldiworkon|whatsgoingon|close|whatsclose)$".format(BOT_ID))
-	HELP_RE = re.compile(r"^(<@{}> )?!help$")
+	HELP_RE = re.compile(r"^(<@{}> )?!help$".format(BOT_ID))
 
 	while True:
 		data = sc.rtm_read()
@@ -43,8 +28,6 @@ def listen_for_text():
 			activity = data[0]
 			try:
 				if activity["type"] == "message" and activity["user"] != BOT_ID:
-					print(activity)
-
 					is_solved = SOLVED_RE.match(activity["text"])
 					almost = ALMOST_RE.match(activity["text"])
 					almost_puzzles = ALMOST_PUZZLES_RE.match(activity["text"])
@@ -62,9 +45,9 @@ def listen_for_text():
 								continue
 						if is_solved.group("solution"):
 							solution = re.sub(r"[^A-Z]", "", is_solved.group("solution").upper())
-							message = ":confetti_ball: *{}*  was solved! :tada:  and the answer is *{}*".format(puzzle_name, solution)
+							message = f":confetti_ball: *{puzzle_name}*  was solved! :tada:  and the answer is *{solution}*"
 						else:
-							message = ":confetti_ball: *{}*  was solved! :tada:".format(puzzle_name)
+							message = f":confetti_ball: *{puzzle_name}*  was solved! :tada:"
 						# print(activity["channel"])
 						if activity["channel"] != "C3N1ZQWP2":
 							sc.api_call("chat.postMessage", text=message, channel="#general", link_names=1, as_user=True)
@@ -78,11 +61,11 @@ def listen_for_text():
 								puzzle_name = channel_res["channel"]["name"]
 							else:
 								continue
-						message = "Thanks.  I'll remember that we're very close on *{}*.".format(puzzle_name)
+						message = f"Thanks.  I'll remember that we're very close on *{puzzle_name}*."
 						close_puzzles.add(puzzle_name.title())
 					elif almost_puzzles:
 						if close_puzzles:
-							message = "We're currently very close on the following: "+ ", ".join("*{}*".format(puzz) for puzz in close_puzzles)
+							message = "We're currently very close on the following: "+ ", ".join(f"*{puzz}*" for puzz in close_puzzles)
 						else:
 							message = "We currently have no puzzles marked as close."
 					elif help:
@@ -126,9 +109,9 @@ def check_for_channels():
 						try:
 							user_res = sc.api_call("users.info", user=channel["creator"])
 							if user_res["ok"]:
-								message = "@{} created the channel #{}  Don't forget to `/invite @simple_bot`!".format(user_res["user"]["name"], channel["name"])
+								message = f"@{user_res['user']['name']} created the channel #{channel['name']}  Don't forget to `/invite @simple_bot`!"
 							else:
-								message = "New channel: #{}  Don't forget to `/invite @simple_bot`!".format(channel["name"])
+								message = "New channel: #{channel['name']}  Don't forget to `/invite @simple_bot`!"
 							
 							sc.api_call("chat.postMessage", text=message, channel="#general", link_names=1, as_user=True)
 							channels[channel["id"]] = channel["name"]
