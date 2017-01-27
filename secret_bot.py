@@ -2,6 +2,7 @@ import os
 import re
 import threading
 import time
+import datetime
 
 from slackclient import SlackClient
 
@@ -13,6 +14,13 @@ API_TOKEN = os.environ["SECRET_BOT_SLACK_API_KEY"]
 BOT_ID = os.environ["SECRET_BOT_SLACK_ID"]
 
 sc = SlackClient(API_TOKEN)
+
+def report_errors(desc, stack_trace):
+	with open("errors.txt", "a+") as f:
+		f.write("~"*50 + "\n\n")
+		f.write(f"{datetime.datetime.now()}\n\n")
+		f.write(desc + "\n\n")
+		f.write(msg + "\n\n")
 
 def listen_for_text():
 	close_puzzles = set()
@@ -91,8 +99,9 @@ def listen_for_text():
 					if "bug" in activity["text"]:
 						sc.api_call("reactions.add", name="bug", channel=activity["channel"], timestamp=activity["ts"])
 			except KeyError as e:
-				print("Key error parsing activity")
-				print(e)
+				report_errors("Key error parsing activity", e)
+				# print("Key error parsing activity")
+				# print(e)
 		time.sleep(.2)
 
 def check_for_channels():
@@ -116,9 +125,7 @@ def check_for_channels():
 							sc.api_call("chat.postMessage", text=message, channel="#general", link_names=1, as_user=True)
 							channels[channel["id"]] = channel["name"]
 						except KeyError as e:
-							print("Key error joining channel")
-							print(e)
-
+							report_errors("Key error notifying about new channel", e)
 		time.sleep(10)
 
 if __name__ == '__main__':
