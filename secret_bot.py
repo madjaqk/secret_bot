@@ -1,8 +1,10 @@
+import datetime
 import os
+import pprint
 import re
 import threading
 import time
-import datetime
+import traceback
 
 from slackclient import SlackClient
 
@@ -15,12 +17,16 @@ BOT_ID = os.environ["SECRET_BOT_SLACK_ID"]
 
 sc = SlackClient(API_TOKEN)
 
-def report_errors(desc, stack_trace):
+def report_errors(desc, stack_trace, variables=None):
 	with open("errors.txt", "a+") as f:
 		f.write("~"*50 + "\n\n")
 		f.write(f"{datetime.datetime.now()}\n\n")
 		f.write(desc + "\n\n")
-		f.write(msg + "\n\n")
+		traceback.print_tb(stack_trace, file=f)
+		f.write("\n")
+		if variables:
+			f.write(pprint.pformat(variables))
+			f.write("\n\n")
 
 def listen_for_text():
 	close_puzzles = set()
@@ -99,7 +105,7 @@ def listen_for_text():
 					if "bug" in activity["text"]:
 						sc.api_call("reactions.add", name="bug", channel=activity["channel"], timestamp=activity["ts"])
 			except KeyError as e:
-				report_errors("Key error parsing activity", e)
+				report_errors("Key error parsing activity", e.__traceback__, {"activity": activity})
 				# print("Key error parsing activity")
 				# print(e)
 		time.sleep(.2)
@@ -125,7 +131,11 @@ def check_for_channels():
 							sc.api_call("chat.postMessage", text=message, channel="#general", link_names=1, as_user=True)
 							channels[channel["id"]] = channel["name"]
 						except KeyError as e:
-							report_errors("Key error notifying about new channel", e)
+							variables = {
+								"user_res": user_res,
+								"channel": channel,
+							}
+							report_errors("Key error notifying about new channel", e.__traceback__, variables)
 		time.sleep(10)
 
 if __name__ == '__main__':
