@@ -17,6 +17,18 @@ BOT_ID = os.environ["SECRET_BOT_SLACK_ID"]
 
 sc = SlackClient(API_TOKEN)
 
+def is_supervocalic(text):
+	vowels = {v: False for v in ("a", "e", "i", "o", "u")}
+	for char in text:
+		if char in vowels:
+			if vowels[char]: 
+				return False
+			else:
+				vowels[char] = True
+
+	return all(vowels.values())
+
+
 def report_errors(desc, stack_trace, variables=None):
 	with open("errors.txt", "a+") as f:
 		f.write("~"*50 + "\n\n")
@@ -29,6 +41,9 @@ def report_errors(desc, stack_trace, variables=None):
 			f.write("\n\n")
 
 def listen_for_text():
+	def add_reaction(emoji):
+			sc.api_call("reactions.add", name=emoji, channel=activity["channel"], timestamp=activity["ts"])
+
 	close_puzzles = set()
 
 	SOLVED_RE = re.compile(r"^(<@{}> )?!solved ?(?P<puzzle_name>\S+)? ?(?P<solution>.+)?$".format(BOT_ID))
@@ -95,15 +110,22 @@ def listen_for_text():
 					if message:
 						sc.api_call("chat.postMessage", text=message, channel=activity["channel"], link_names=1, as_user=True)
 
-					if "secret" in activity["text"]:
+					text = activity["text"].lower()
+
+					if "secret" in text:
 						with open("LOZ_Secret.wav", "rb") as f:
 							sc.api_call("files.upload", filename="LOZ_Secret.wav", file=f, channels=activity["channel"])
-					
-					if "squirrel" in activity["text"]:
-						sc.api_call("reactions.add", name="squirrel", channel=activity["channel"], timestamp=activity["ts"])
 
-					if "bug" in activity["text"]:
-						sc.api_call("reactions.add", name="bug", channel=activity["channel"], timestamp=activity["ts"])
+					watch_words = (
+						((lambda t: "squirrel" in t), "squirrel"),
+						((lambda t: "bug" in t), "bug"),
+						(is_supervocalic, "aeiou"),
+						)
+
+					for func, emoji in watch_words:
+						if func(text):
+							add_reaction(emoji)
+
 			except KeyError as e:
 				report_errors("Key error parsing activity", e.__traceback__, {"activity": activity})
 				# print("Key error parsing activity")
