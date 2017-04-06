@@ -110,7 +110,7 @@ def listen_for_text():
 					if message:
 						sc.api_call("chat.postMessage", text=message, channel=activity["channel"], link_names=1, as_user=True)
 
-					text = activity["text"].lower()
+					text = re.sub(r"&amp;", "&", activity["text"].lower())
 
 					if "secret" in text:
 						with open("LOZ_Secret.wav", "rb") as f:
