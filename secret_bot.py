@@ -1,8 +1,16 @@
+import datetime
 import os
+import pprint
 import re
+import threading
 import time
+import traceback
 
 from slackclient import SlackClient
+
+SECRET_RE = re.compile(r"secret", re.I)
+SQUIRREL_RE = re.compile(r"squirrel", re.I)
+BUG_RE = re.compile(r"bug", re.I)
 
 API_TOKEN = os.environ["SECRET_BOT_SLACK_API_KEY"]
 BOT_ID = os.environ["SECRET_BOT_SLACK_ID"]
@@ -20,9 +28,21 @@ def is_supervocalic(text):
 
 	return all(vowels.values())
 
+
+def report_errors(desc, stack_trace, variables=None):
+	with open("errors.txt", "a+") as f:
+		f.write("~"*50 + "\n\n")
+		f.write(f"{datetime.datetime.now()}\n\n")
+		f.write(desc + "\n\n")
+		traceback.print_tb(stack_trace, file=f)
+		f.write("\n")
+		if variables:
+			f.write(pprint.pformat(variables))
+			f.write("\n\n")
+
 def listen_for_text():
 	def add_reaction(emoji):
-		sc.api_call("reactions.add", name=emoji, channel=activity["channel"], timestamp=activity["ts"])
+			sc.api_call("reactions.add", name=emoji, channel=activity["channel"], timestamp=activity["ts"])
 
 	close_puzzles = set()
 
@@ -57,6 +77,7 @@ def listen_for_text():
 							message = f":confetti_ball: *{puzzle_name}*  was solved! :tada:  and the answer is *{solution}*"
 						else:
 							message = f":confetti_ball: *{puzzle_name}*  was solved! :tada:"
+						# print(activity["channel"])
 						if activity["channel"] != "C3N1ZQWP2":
 							sc.api_call("chat.postMessage", text=message, channel="#general", link_names=1, as_user=True)
 						close_puzzles.discard(puzzle_name.title())
@@ -106,11 +127,51 @@ def listen_for_text():
 							add_reaction(emoji)
 
 			except KeyError as e:
-				print("Key error parsing activity")
-				print(e)
+				report_errors("Key error parsing activity", e.__traceback__, {"activity": activity})
+				# print("Key error parsing activity")
+				# print(e)
 		time.sleep(.2)
+
+def check_for_channels():
+	channels = {}
+	while True:
+		api_res = sc.api_call("channels.list", exclude_archived=True)
+		if api_res["ok"]:
+			if not channels:
+				for channel in api_res["channels"]:
+					channels[channel["id"]] = channel["name"]
+			else:
+				for channel in api_res["channels"]:
+					if channel["id"] not in channels:
+						try:
+							user_res = sc.api_call("users.info", user=channel["creator"])
+							if user_res["ok"]:
+								message = f"@{user_res['user']['name']} created the channel #{channel['name']}  Don't forget to `/invite @simple_bot`!"
+							else:
+								message = "New channel: #{channel['name']}  Don't forget to `/invite @simple_bot`!"
+							
+							sc.api_call("chat.postMessage", text=message, channel="#general", link_names=1, as_user=True)
+							channels[channel["id"]] = channel["name"]
+						except KeyError as e:
+							variables = {
+								"user_res": user_res,
+								"channel": channel,
+							}
+							report_errors("Key error notifying about new channel", e.__traceback__, variables)
+		time.sleep(10)
 
 if __name__ == '__main__':
 	if sc.rtm_connect():
 		print("Connected?")
-		listen_for_text()
+		channel_thread = threading.Thread(target=check_for_channels, name="channel_thread")
+		text_thread = threading.Thread(target=listen_for_text, name="text_thread")
+
+		channel_thread.daemon = text_thread.daemon = True
+
+		channel_thread.start()
+		text_thread.start()
+
+		while True:
+			time.sleep(60)
+
+		# check_for_channels()
