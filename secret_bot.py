@@ -132,46 +132,24 @@ def listen_for_text():
 				# print(e)
 		time.sleep(.2)
 
-def check_for_channels():
-	channels = {}
-	while True:
-		api_res = sc.api_call("channels.list", exclude_archived=True)
-		if api_res["ok"]:
-			if not channels:
-				for channel in api_res["channels"]:
-					channels[channel["id"]] = channel["name"]
-			else:
-				for channel in api_res["channels"]:
-					if channel["id"] not in channels:
-						try:
-							user_res = sc.api_call("users.info", user=channel["creator"])
-							if user_res["ok"]:
-								message = f"@{user_res['user']['name']} created the channel #{channel['name']}  Don't forget to `/invite @simple_bot`!"
-							else:
-								message = "New channel: #{channel['name']}  Don't forget to `/invite @simple_bot`!"
-							
-							sc.api_call("chat.postMessage", text=message, channel="#general", link_names=1, as_user=True)
-							channels[channel["id"]] = channel["name"]
-						except KeyError as e:
-							variables = {
-								"user_res": user_res,
-								"channel": channel,
-							}
-							report_errors("Key error notifying about new channel", e.__traceback__, variables)
-		time.sleep(10)
+def create_text_thread():
+	text_thread = threading.Thread(target=listen_for_text, name="text_thread")
+
+	text_thread.daemon = True
+	text_thread.start()
+
+	return text_thread
+
 
 if __name__ == '__main__':
 	if sc.rtm_connect():
 		print("Connected?")
-		channel_thread = threading.Thread(target=check_for_channels, name="channel_thread")
-		text_thread = threading.Thread(target=listen_for_text, name="text_thread")
-
-		channel_thread.daemon = text_thread.daemon = True
-
-		channel_thread.start()
-		text_thread.start()
+		
+		text_thread = create_text_thread()
 
 		while True:
 			time.sleep(60)
+			if not text_thread.isAlive():
+				text_thread = create_text_thread()
 
 		# check_for_channels()
