@@ -36,7 +36,7 @@ def listen_for_text():
 		if data:
 			activity = data[0]
 			try:
-				if activity["type"] == "message" and "subtype" not in activity and activity["user"] != BOT_ID:
+				if activity and activity["type"] == "message" and "subtype" not in activity and activity["user"] != BOT_ID:
 					is_solved = SOLVED_RE.match(activity["text"])
 					almost = ALMOST_RE.match(activity["text"])
 					almost_puzzles = ALMOST_PUZZLES_RE.match(activity["text"])
