@@ -15,8 +15,6 @@ BUG_RE = re.compile(r"bug", re.I)
 API_TOKEN = os.environ["SECRET_BOT_SLACK_API_KEY"]
 BOT_ID = os.environ["SECRET_BOT_SLACK_ID"]
 
-sc = SlackClient(API_TOKEN)
-
 def is_supervocalic(text):
 	vowels = {v: False for v in ("a", "e", "i", "o", "u")}
 	for char in text:
@@ -40,7 +38,7 @@ def report_errors(desc, stack_trace, variables=None):
 			f.write(pprint.pformat(variables))
 			f.write("\n\n")
 
-def listen_for_text():
+def listen_for_text(sc):
 	def add_reaction(emoji):
 			sc.api_call("reactions.add", name=emoji, channel=activity["channel"], timestamp=activity["ts"])
 
@@ -52,7 +50,17 @@ def listen_for_text():
 	HELP_RE = re.compile(r"^(<@{}> )?!help$".format(BOT_ID))
 
 	while True:
-		data = sc.rtm_read()
+		data = None
+		try:
+			data = sc.rtm_read()
+		except WebSocketConnectionClosedException:
+			console.log("WebSocketConnectionClosedException")
+
+			if sc.rtm_connect():
+				console.log("Reconnected?")
+			else:
+				console.log("Couldn't reconnect, probably everything is broken")
+
 		if data:
 			activity = data[0]
 			try:
@@ -132,8 +140,8 @@ def listen_for_text():
 				# print(e)
 		time.sleep(.2)
 
-def create_text_thread():
-	text_thread = threading.Thread(target=listen_for_text, name="text_thread")
+def create_text_thread(sc):
+	text_thread = threading.Thread(target=listen_for_text, name="text_thread", args=[sc])
 
 	text_thread.daemon = True
 	text_thread.start()
@@ -142,10 +150,12 @@ def create_text_thread():
 
 
 if __name__ == '__main__':
+	sc = SlackClient(API_TOKEN)
+
 	if sc.rtm_connect():
 		print("Connected?")
 		
-		text_thread = create_text_thread()
+		text_thread = create_text_thread(sc)
 
 		while True:
 			time.sleep(60)
