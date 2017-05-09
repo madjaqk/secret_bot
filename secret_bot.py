@@ -7,6 +7,7 @@ import time
 import traceback
 
 from slackclient import SlackClient
+from websocket._exceptions import WebSocketConnectionClosedException
 
 SECRET_RE = re.compile(r"secret", re.I)
 SQUIRREL_RE = re.compile(r"squirrel", re.I)
@@ -160,6 +161,6 @@ if __name__ == '__main__':
 		while True:
 			time.sleep(60)
 			if not text_thread.isAlive():
-				text_thread = create_text_thread()
+				text_thread = create_text_thread(sc)
 
 		# check_for_channels()
