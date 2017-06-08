@@ -55,12 +55,12 @@ def listen_for_text(sc):
 		try:
 			data = sc.rtm_read()
 		except WebSocketConnectionClosedException:
-			console.log("WebSocketConnectionClosedException")
+			print("WebSocketConnectionClosedException")
 
 			if sc.rtm_connect():
-				console.log("Reconnected?")
+				print("Reconnected?")
 			else:
-				console.log("Couldn't reconnect, probably everything is broken")
+				print("Couldn't reconnect, probably everything is broken")
 
 		if data:
 			activity = data[0]
